@@ -1,0 +1,146 @@
+#if (ARDUINO >= 100)
+ #include <Arduino.h>
+#else
+ #include <WProgram.h>
+#endif
+#define ESP32
+#define ROSSERIAL_ARDUINO_TCP
+#include <WiFi.h> 
+#include <ros.h>
+#include <geometry_msgs/Twist.h>
+#include <std_msgs/String.h>
+
+const char* ssid = "*******"; // Nome da rede WiFi
+const char* password = "**********"; // Senha do WiFi
+IPAddress server(192,168,1,12); // Adicionar o ip do computador utilizado
+const uint16_t serverPort = 11411;
+
+ros::NodeHandle nh;
+geometry_msgs::Twist msg;
+std_msgs::String str_msg;
+ros::Publisher chatter("chatter", &str_msg);
+
+void frente()
+{
+  digitalWrite(27, LOW);
+  digitalWrite(26, HIGH);
+  digitalWrite(25, HIGH);
+  digitalWrite(33, LOW);
+  str_msg.data = "Frente";
+  chatter.publish(&str_msg);
+}
+
+void esquerda()
+{
+  digitalWrite(27, LOW);
+  digitalWrite(26, HIGH);
+  digitalWrite(25, LOW);
+  digitalWrite(33, HIGH);
+  str_msg.data = "Esquerda";
+  chatter.publish(&str_msg);
+}
+
+void parar()
+{
+  digitalWrite(27, LOW);
+  digitalWrite(26, LOW);
+  digitalWrite(25, LOW);
+  digitalWrite(33, LOW);
+  str_msg.data = "Parar";
+  chatter.publish(&str_msg);
+}
+
+void direita()
+{
+  digitalWrite(27, HIGH);
+  digitalWrite(26, LOW);
+  digitalWrite(25, HIGH);
+  digitalWrite(33, LOW);
+  str_msg.data = "Direita";
+  chatter.publish(&str_msg);
+}
+
+void atras()
+{
+  digitalWrite(27, HIGH);
+  digitalWrite(26, LOW);
+  digitalWrite(25, LOW);
+  digitalWrite(33, HIGH);
+  str_msg.data = "Atras";
+  chatter.publish(&str_msg);
+}
+
+void roverCallBack(const geometry_msgs::Twist& cmd_vel)
+{
+
+  if(cmd_vel.linear.x > 0 && cmd_vel.angular.z == 0) //I
+  {
+    frente();
+    digitalWrite(13, HIGH-digitalRead(13));
+  }
+  else
+  {
+    if(cmd_vel.linear.x == 0 && cmd_vel.angular.z > 0) //J
+    {
+      esquerda();
+      digitalWrite(13, HIGH-digitalRead(13));
+    }
+    else
+    {
+      if(cmd_vel.linear.x == 0 && cmd_vel.angular.z == 0) //K
+      {
+        parar();
+        digitalWrite(13, HIGH-digitalRead(13));
+      }
+      else
+      {
+        if(cmd_vel.linear.x == 0 && cmd_vel.angular.z < 0) //L
+        {
+          direita();
+          digitalWrite(13, HIGH-digitalRead(13));
+        }
+        else
+        {
+          if(cmd_vel.linear.x < 0 && cmd_vel.angular.z == 0) //,
+          {
+            atras();
+            digitalWrite(13, HIGH-digitalRead(13));
+          }
+          else //default
+          {
+            parar();
+            digitalWrite(13, HIGH-digitalRead(13));
+          }
+        }
+      }
+    }
+  }
+}
+
+ros::Subscriber <geometry_msgs::Twist> sub("cmd_vel", roverCallBack);
+
+void setup(){
+  pinMode(2, OUTPUT);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+  }
+  digitalWrite(2, HIGH);
+  nh.getHardware() -> setConnection(server, serverPort);
+
+  pinMode(13, OUTPUT);
+  pinMode(27, OUTPUT);
+  pinMode(26, OUTPUT); 
+  pinMode(25, OUTPUT); 
+  pinMode(33, OUTPUT); 
+
+  nh.initNode();
+  nh.subscribe(sub);
+  nh.advertise(chatter);
+}
+
+void loop(){
+  nh.spinOnce();
+  delay(1);
+}
